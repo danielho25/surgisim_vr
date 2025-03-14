@@ -1,14 +1,14 @@
 import numpy as np
 from sklearn.ensemble import \
     RandomForestClassifier  # multiple decision trees trained on different parts of training data
-from sklearn.preprocessing import OneHotEncoder  # convert categorical to numerical data for preprocessing
+# from sklearn.preprocessing import OneHotEncoder  # convert categorical to numerical data for preprocessing
 
 
 class question_model:
     def __init__(self):
         # initialize random forest classifier
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
-        self.encoder = OneHotEncoder(sparse_output=False)
+        # self.encoder = OneHotEncoder(sparse_output=False)
         self.is_trained = False
 
         # Define sample data (Change to actual used questions later)
