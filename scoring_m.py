@@ -150,17 +150,22 @@ def generate_random_questions(num_questions=20):
         {"template": "What does the term '{key}' mean in medical context?", 
          "generator": lambda: (random.choice(list(medical_terms["anatomical_terms"].items())), 1)},
         {"template": "What is the primary function of the {key}?", 
-         "generator": lambda: ((organ, info[0]) for organ, info in medical_terms["organs"].items()), 1},
+         "generator": lambda: ((organ, info[0]) for organ, info in medical_terms["organs"].items()),
+         "difficulty": 1},
         {"template": "In which body system would you find the {key}?", 
-         "generator": lambda: ((organ, info[2]) for organ, info in medical_terms["organs"].items()), 1},
+         "generator": lambda: ((organ, info[2]) for organ, info in medical_terms["organs"].items()),
+         "difficulty": 1},
         
         # Hard questions (difficulty 2)
         {"template": "What is the medical term for {description}?", 
-         "generator": lambda: ((value, key) for key, value in medical_terms["medical_terms"].items()), 2},
+         "generator": lambda: ((value, key) for key, value in medical_terms["medical_terms"].items()),
+         "difficulty": 2},
         {"template": "Which medical condition is characterized by {answer}?", 
-         "generator": lambda: (("excessive " + value, key + "osis") for key, value in random.sample(list(medical_terms["organs"].items()), 5)), 2},
+         "generator": lambda: (("excessive " + value, key + "osis") for key, value in random.sample(list(medical_terms["organs"].items()), 5)),
+         "difficulty": 2},
         {"template": "What is the anatomical term for {answer}?", 
-         "generator": lambda: ((value, key) for key, value in medical_terms["anatomical_terms"].items()), 2},
+         "generator": lambda: ((value, key) for key, value in medical_terms["anatomical_terms"].items()),
+         "difficulty": 2},
     ]
     
     # Generate questions
@@ -169,8 +174,10 @@ def generate_random_questions(num_questions=20):
         template = random.choice(question_templates)
         
         try:
-            # Get a key-value pair and difficulty from the generator
-            item, difficulty = next(template["generator"]())
+            # Get a key-value pair from the generator
+            item = next(template["generator"]())
+            # Get difficulty from the template
+            difficulty = template["difficulty"]
             
             if isinstance(item, tuple):
                 key, value = item
