@@ -1,105 +1,223 @@
-import numpy as np
-from sklearn.ensemble import \
-    RandomForestClassifier  # multiple decision trees trained on different parts of training data
-# from sklearn.preprocessing import OneHotEncoder  # convert categorical to numerical data for preprocessing
+import csv
+import random
+import datetime
+from io import StringIO
+
+sample_data = """question,answer,score
+What is the term for the process of making an incision in the skin during surgery?,Incision,0
+"What does the prefix ""hypo-"" mean in medical terminology?",Below normal or deficient,0
+What body system includes the heart and blood vessels?,Cardiovascular system,0
+"What does the suffix ""-itis"" indicate in medical terminology?",Inflammation,0
+What is the medical term for a blood clot?,Thrombus,0
+What organ is responsible for producing insulin?,Pancreas,0
+"What does the term ""bilateral"" mean in medical context?",Affecting both sides,0
+What is the membrane that surrounds the lungs called?,Pleura,1
+What is the medical term for excessive thirst?,Polydipsia,1
+"What does the prefix ""tachy-"" refer to in medical terminology?",Rapid or fast,1
+What is the medical term for the voice box?,Larynx,1
+What is the medical term for the process of converting food into energy?,Metabolism,1
+"What does the term ""idiopathic"" mean in medical diagnosis?",Of unknown cause,1
+What is the medical term for the collarbone?,Clavicle,1
+What is the name of the membrane that surrounds the heart?,Pericardium,2
+"What does the term ""sequela"" refer to in medical context?",A condition that follows as a consequence of a disease,2
+What is the medical term for the surgical creation of an opening between two hollow organs?,Anastomosis,2
+"What does the term ""prodromal"" refer to in disease progression?",Early symptoms indicating onset of disease,2
+What is the term for abnormal backward flow of blood through a valve?,Regurgitation,2
+What is the medical term for the layer between the epidermis and subcutaneous tissue?,Dermis,2"""
 
 
-class question_model:
-    def __init__(self):
-        # initialize random forest classifier
-        self.model = RandomForestClassifier(n_estimators=100, random_state=42)
-        # self.encoder = OneHotEncoder(sparse_output=False)
-        self.is_trained = False
+class quiz_model:
+    def __init__(self, data):
+        # store the questions by difficulty
+        self.question_difficulty = {
+            0: [],
+            1: [],
+            2: []
+        }
 
-        # Define sample data (Change to actual used questions later)
-        # stored format, current question rank (0 = easy, 2 = hard, is answer correct (0 = no, 1 = yes), previous q rank
-        question_data = np.array([
-            [0, 1, 0],
-            [0, 0, 0],
-            [1, 1, 0],
-            [1, 0, 1],
-            [2, 1, 1],
-            [1, 0, 2],
-        ])
+        # set initial difficulty to 0
+        self.current_difficulty = 0
+        self.score = 0
+        self.questions_asked = 0
 
-        next_difficulty = np.array([0, 0, 1, 0, 2, 0])
-        self.train_model(question_data, next_difficulty)
+        # Add session tracking for detailed reporting
+        self.session_details = []
+        self.session_start_time = None
+        self.session_end_time = None
 
-    def train_model(self, data, next_d):
-        self.model.fit(data, next_d)
-        self.is_trained = True
+        # read csv data
+        csv_reader = csv.reader(StringIO(data))
+        next(csv_reader)  # skip the header row
 
-    def next_question_difficulty(self, current_difficulty, correct_answer, previous_difficulty):
-        # Check if the model is trained
-        if not self.is_trained:
-            # If not trained, use simple rule-based approach
-            return min(current_difficulty + 1, 2)  # return the min of current level +1, with max of 2
+        # read the csv files
+        for row in csv_reader:
+            question, answer, difficulty = row
+            # convert the difficulty into an int
+            difficulty = int(difficulty)
+            # store each question according to difficulty
+            self.question_difficulty[difficulty].append({
+                'question': question,
+                'answer': answer,
+                'difficulty': difficulty
+            })
 
-        # If the model is trained, use it to predict the next difficulty
-        input_data = np.array([[current_difficulty, correct_answer, previous_difficulty]])
-        next_difficulty = self.model.predict(input_data)[0]
-        return next_difficulty
+    # selects a new question based on difficulty
+    def next_q(self):
+        # if there are no questions at current difficulty level
+        if not self.question_difficulty[self.current_difficulty]:
+            available_question_difficulty = []  # list of available questions left based on difficulty
 
-    def update_data(self, new_data, new_difficulty):
-        if self.is_trained:
-            self.model.fit(new_data, new_difficulty)
-        else:
-            self.train_model(new_data, new_difficulty)
+            for difficulty, questions in self.question_difficulty.items():
+                if questions:  # if the list is not empty add it to the list of available questions
+                    available_question_difficulty.append(difficulty)
 
-    def update_model(self, update_data, update_next_difficulty):
-        self.update_data(np.array(update_data), np.array(update_next_difficulty))
+            # Check if there are any questions available at all
+            if not available_question_difficulty:
+                return None  # Return None if no more questions are available
 
+            # Choose a random difficulty level from available ones
+            self.current_difficulty = random.choice(available_question_difficulty)
 
-def main():
-    model = question_model()
-    question_bank = {
-        0: [
-            "What is the name of the process of making an incision in the skin during surgery?",
-            "Which instrument is commonly used to make surgical incisions?",
-            "What is the medical term for stitching a wound closed?"
-        ],
-        1: [
-            "What is the purpose of hemostats in surgery?",
-            "Which type of anesthesia allows a patient to remain awake but pain-free during surgery?",
-            "What is the difference between a laparoscopic and an open surgical procedure?"
-        ],
-        2: [
-            "What are the main differences between absorbable and non-absorbable sutures, and when is each used?",
-            "In what situations would a surgeon choose to perform a fasciotomy?",
-            "What are the key steps in preventing surgical site infections (SSIs) in the operating room?"
-        ]
-    }
+        # Pick a random question from current difficulty
+        new_random_question = random.choice(self.question_difficulty[self.current_difficulty])
 
-    # store the data in a session
-    update_data = []
-    update_next_difficulty = []
+        # Remove the question from the list
+        self.question_difficulty[self.current_difficulty].remove(new_random_question)
+        return new_random_question
 
-    current_diff = 1
-    previous_diff = 0
+    def check_answer(self, user_answer, correct_answer):
+        return user_answer.lower().strip() == correct_answer.lower().strip()
 
-    for i in range(3):
-        q = np.random.choice(question_bank[current_diff])
-        print(f"{q}  \nCurrent Difficulty: {current_diff}")
-        # simulate an answer using 0 for incorrect and 1 for correct at random
-        correct = np.random.choice([0, 1])
-        if correct:
-            print(f"you answered correctly!")
-        else:
-            print("sorry that is incorrect")
+    def adjust_question_difficulty(self, is_correct):
+        max_difficulty = max(self.question_difficulty.keys())
+        min_difficulty = min(self.question_difficulty.keys())
 
-        # record the results of the session answers
-        update_data.append([current_diff, correct, previous_diff])
+        if is_correct:  # if the user is correct
+            if self.current_difficulty < max_difficulty:  # if not at most difficult question
+                self.current_difficulty += 1  # increase the difficulty
+        else:  # if incorrect
+            if self.current_difficulty > min_difficulty:
+                self.current_difficulty -= 1  # decrease difficulty if not at lowest level
 
-        # predict the next questions difficulty
-        next_diff = model.next_question_difficulty(current_diff, correct, previous_diff)
-        print(f"Model recommends: {next_diff}") # debugging to see what the model will predict
+    def save_results_to_csv(self, filename=None):
+        """
+        Save the session results to a CSV file with comprehensive performance data.
 
-        update_next_difficulty.append(next_diff)
-        previous_diff = current_diff
-        current_diff = next_diff
+        Args:
+            filename: Optional filename for the CSV. If None, generates a timestamped filename.
 
-    model.update_data(update_data, update_next_difficulty)
-    print("model updated!")
+        Returns:
+            str: Path to the saved CSV file
+        """
+        if not self.session_details:
+            print("No session data available to save!")
+            return None
+
+        # Generate default filename with timestamp if not provided
+        if filename is None:
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"quiz_results_{timestamp}.csv"
+
+        try:
+            with open(filename, 'w', newline='') as csvfile:
+                # Define CSV structure with comprehensive metrics
+                fieldnames = [
+                    'question_number',
+                    'question_text',
+                    'difficulty_level',
+                    'user_answer',
+                    'correct_answer',
+                    'is_correct',
+                    'cumulative_score'
+                ]
+
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+
+                # Write each question's data
+                for record in self.session_details:
+                    writer.writerow(record)
+
+                # Add summary metrics at the end
+                writer.writerow({
+                    'question_number': 'SUMMARY',
+                    'question_text': f'Session Duration: {(self.session_end_time - self.session_start_time).total_seconds():.2f} seconds',
+                    'difficulty_level': f'Final Difficulty: {self.current_difficulty}',
+                    'user_answer': '',
+                    'correct_answer': '',
+                    'is_correct': '',
+                    'cumulative_score': f'Final Score: {self.score}/{self.questions_asked} ({(self.score / self.questions_asked * 100) if self.questions_asked > 0 else 0:.1f}%)'
+                })
+
+            print(f"Results successfully saved to {filename}")
+            return filename
+
+        except Exception as e:
+            print(f"Error saving results: {e}")
+            return None
+
+    def start_session(self, question_limit=5):
+        self.score = 0
+        self.questions_asked = 0
+        self.session_details = []  # Reset session data
+        self.session_start_time = datetime.datetime.now()  # Record start time
+
+        print("Welcome to the Adaptive Surgery Quiz!")
+        print("Answer the questions to test your medical knowledge.")
+        print("Questions will adapt based on your performance.\n")
+
+        while self.questions_asked < question_limit:
+            new_random_question = self.next_q()
+
+            # Check if we have a valid question
+            if new_random_question is None:
+                print("No more questions available!")
+                break
+
+            print(f"Question Difficulty: {new_random_question['difficulty']}")
+            print(f"Question {self.questions_asked + 1}: {new_random_question['question']}")
+
+            user_answer = input("Please enter your answer: ")
+            is_correct = self.check_answer(user_answer, new_random_question['answer'])
+
+            if is_correct:
+                print("Correct!")
+                self.score += 1
+            else:
+                print(f"Incorrect! Correct Answer: {new_random_question['answer']}")
+
+            # Track detailed question data for reporting
+            self.session_details.append({
+                'question_number': self.questions_asked + 1,
+                'question_text': new_random_question['question'],
+                'difficulty_level': new_random_question['difficulty'],
+                'user_answer': user_answer,
+                'correct_answer': new_random_question['answer'],
+                'is_correct': is_correct,
+                'cumulative_score': f"{self.score}/{self.questions_asked + 1}"
+            })
+
+            self.questions_asked += 1
+            self.adjust_question_difficulty(is_correct)
+            print(f"Current score: {self.score}/{self.questions_asked}\n")
+
+        self.session_end_time = datetime.datetime.now()  # Record end time
+
+        print(f"\nQuiz completed! Your score: {self.score}/{self.questions_asked}")
+        print(f"Final difficulty level reached: {self.current_difficulty}")
+
+        # Ask user if they want to save results
+        save_results = input("\nWould you like to save your results to a CSV file? (y/n): ")
+        if save_results.lower().startswith('y'):
+            filename = 'results.csv'
+            self.save_results_to_csv(filename)
+
 
 if __name__ == "__main__":
-    main()
+    quiz = quiz_model(sample_data)
+    quiz.start_session()
+
+
+
+
+
