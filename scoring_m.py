@@ -2,7 +2,9 @@ import csv
 import random
 import datetime
 from io import StringIO
+import string
 
+# Sample data as a fallback option
 sample_data = """question,answer,score
 What is the term for the process of making an incision in the skin during surgery?,Incision,0
 "What does the prefix ""hypo-"" mean in medical terminology?",Below normal or deficient,0
@@ -25,9 +27,202 @@ What is the medical term for the surgical creation of an opening between two hol
 What is the term for abnormal backward flow of blood through a valve?,Regurgitation,2
 What is the medical term for the layer between the epidermis and subcutaneous tissue?,Dermis,2"""
 
+# Medical terminology data for generating random questions
+medical_terms = {
+    "prefixes": {
+        "hypo-": "below normal or deficient",
+        "hyper-": "excessive or above normal",
+        "tachy-": "rapid or fast",
+        "brady-": "slow",
+        "dys-": "difficult, painful, or abnormal",
+        "a-/an-": "absence or lack of",
+        "endo-": "within or inside",
+        "exo-": "outside or outward",
+        "hemi-": "half",
+        "macro-": "large",
+        "micro-": "small",
+        "neo-": "new",
+        "poly-": "many or much",
+        "post-": "after or behind",
+        "pre-": "before or in front of",
+    },
+    "suffixes": {
+        "-itis": "inflammation",
+        "-osis": "condition, usually abnormal",
+        "-oma": "tumor or mass",
+        "-pathy": "disease",
+        "-ectomy": "surgical removal",
+        "-otomy": "surgical incision",
+        "-plasty": "surgical repair",
+        "-scopy": "visual examination",
+        "-gram": "record or image",
+        "-algia": "pain",
+        "-emia": "blood condition",
+        "-penia": "deficiency",
+        "-megaly": "enlargement",
+        "-rrhea": "flow or discharge",
+        "-phobia": "fear",
+    },
+    "organs": {
+        "heart": ["pumps blood", "cardiac", "cardiovascular system"],
+        "lungs": ["respiration", "pulmonary", "respiratory system"],
+        "liver": ["detoxifies blood", "hepatic", "digestive system"],
+        "kidneys": ["filter blood", "renal", "urinary system"],
+        "brain": ["controls body functions", "cerebral", "nervous system"],
+        "stomach": ["digests food", "gastric", "digestive system"],
+        "pancreas": ["produces insulin", "pancreatic", "endocrine system"],
+        "spleen": ["filters blood", "splenic", "lymphatic system"],
+        "thyroid": ["regulates metabolism", "thyroid", "endocrine system"],
+        "gallbladder": ["stores bile", "biliary", "digestive system"],
+    },
+    "medical_terms": {
+        "thrombus": "blood clot",
+        "embolus": "traveling blood clot",
+        "ischemia": "inadequate blood supply",
+        "necrosis": "death of tissue",
+        "edema": "swelling due to fluid",
+        "stenosis": "narrowing of a passage",
+        "hypertension": "high blood pressure",
+        "hypotension": "low blood pressure",
+        "tachycardia": "rapid heart rate",
+        "bradycardia": "slow heart rate",
+        "dyspnea": "difficulty breathing",
+        "apnea": "temporary cessation of breathing",
+        "hemoptysis": "coughing up blood",
+        "hematemesis": "vomiting blood",
+        "hematuria": "blood in urine",
+        "melena": "black, tarry stool",
+        "jaundice": "yellowing of skin",
+        "cyanosis": "bluish discoloration of skin",
+        "syncope": "fainting",
+        "vertigo": "dizziness",
+    },
+    "anatomical_terms": {
+        "anterior": "front",
+        "posterior": "back",
+        "superior": "above",
+        "inferior": "below",
+        "medial": "toward the middle",
+        "lateral": "away from the middle",
+        "proximal": "closer to the point of attachment",
+        "distal": "farther from the point of attachment",
+        "superficial": "near the surface",
+        "deep": "away from the surface",
+        "bilateral": "affecting both sides",
+        "unilateral": "affecting one side",
+        "ipsilateral": "on the same side",
+        "contralateral": "on the opposite side",
+        "dorsal": "back side",
+        "ventral": "front side",
+    },
+    "body_systems": {
+        "cardiovascular system": ["heart", "blood vessels", "circulation"],
+        "respiratory system": ["lungs", "breathing", "gas exchange"],
+        "digestive system": ["stomach", "intestines", "digestion"],
+        "nervous system": ["brain", "spinal cord", "nerves"],
+        "endocrine system": ["hormones", "glands", "regulation"],
+        "urinary system": ["kidneys", "bladder", "urine production"],
+        "reproductive system": ["gonads", "genitalia", "reproduction"],
+        "immune system": ["white blood cells", "antibodies", "defense"],
+        "integumentary system": ["skin", "hair", "nails"],
+        "musculoskeletal system": ["muscles", "bones", "movement"],
+    },
+}
+
+def generate_random_questions(num_questions=20):
+    """Generate random medical questions with varying difficulty levels"""
+    questions = []
+    
+    # Define question templates with their difficulty levels
+    question_templates = [
+        # Easy questions (difficulty 0)
+        {"template": "What is the medical term for {answer}?", 
+         "generator": lambda: (random.choice(list(medical_terms["medical_terms"].items())), 0)},
+        {"template": "What does the prefix '{key}' mean in medical terminology?", 
+         "generator": lambda: (random.choice(list(medical_terms["prefixes"].items())), 0)},
+        {"template": "What does the suffix '{key}' indicate in medical terminology?", 
+         "generator": lambda: (random.choice(list(medical_terms["suffixes"].items())), 0)},
+        {"template": "What body system includes the {key}?", 
+         "generator": lambda: (random.choice([(organ, system) for system, components in medical_terms["body_systems"].items() 
+                                             for organ in components if len(organ) > 3]), 0)},
+        
+        # Medium questions (difficulty 1)
+        {"template": "What does the term '{key}' mean in medical context?", 
+         "generator": lambda: (random.choice(list(medical_terms["anatomical_terms"].items())), 1)},
+        {"template": "What is the primary function of the {key}?", 
+         "generator": lambda: ((organ, info[0]) for organ, info in medical_terms["organs"].items()), 1},
+        {"template": "In which body system would you find the {key}?", 
+         "generator": lambda: ((organ, info[2]) for organ, info in medical_terms["organs"].items()), 1},
+        
+        # Hard questions (difficulty 2)
+        {"template": "What is the medical term for {description}?", 
+         "generator": lambda: ((value, key) for key, value in medical_terms["medical_terms"].items()), 2},
+        {"template": "Which medical condition is characterized by {answer}?", 
+         "generator": lambda: (("excessive " + value, key + "osis") for key, value in random.sample(list(medical_terms["organs"].items()), 5)), 2},
+        {"template": "What is the anatomical term for {answer}?", 
+         "generator": lambda: ((value, key) for key, value in medical_terms["anatomical_terms"].items()), 2},
+    ]
+    
+    # Generate questions
+    while len(questions) < num_questions:
+        # Select a random template
+        template = random.choice(question_templates)
+        
+        try:
+            # Get a key-value pair and difficulty from the generator
+            item, difficulty = next(template["generator"]())
+            
+            if isinstance(item, tuple):
+                key, value = item
+            else:
+                key, value = item, ""
+                
+            # Format the question
+            question = template["template"].format(key=key, answer=value, description=value)
+            
+            # Add to questions if not already present
+            if not any(q["question"] == question for q in questions):
+                questions.append({
+                    "question": question,
+                    "answer": value if isinstance(value, str) else key,
+                    "difficulty": difficulty
+                })
+        except (StopIteration, TypeError):
+            # If generator is exhausted or returns incorrect format, try another template
+            continue
+    
+    # If we couldn't generate enough questions, fill with random ones
+    while len(questions) < num_questions:
+        difficulty = random.choice([0, 1, 2])
+        question = f"Medical question #{len(questions)+1}"
+        answer = ''.join(random.choices(string.ascii_uppercase, k=5))
+        
+        questions.append({
+            "question": question,
+            "answer": answer,
+            "difficulty": difficulty
+        })
+    
+    # Convert to CSV format
+    csv_data = "question,answer,score\n"
+    for q in questions:
+        # Escape quotes in the question and answer
+        question = q["question"].replace('"', '""')
+        answer = q["answer"].replace('"', '""')
+        
+        # Add quotes if there are commas in the question or answer
+        if ',' in question:
+            question = f'"{question}"'
+        if ',' in answer:
+            answer = f'"{answer}"'
+            
+        csv_data += f"{question},{answer},{q['difficulty']}\n"
+    
+    return csv_data
+
 
 class quiz_model:
-    def __init__(self, data):
+    def __init__(self, data=None, use_random=True, num_questions=20):
         # store the questions by difficulty
         self.question_difficulty = {
             0: [],
@@ -45,21 +240,33 @@ class quiz_model:
         self.session_start_time = None
         self.session_end_time = None
 
+        # Generate random questions if requested
+        if use_random:
+            data = generate_random_questions(num_questions)
+        # Use provided data or fallback to sample data
+        elif data is None:
+            data = sample_data
+
         # read csv data
         csv_reader = csv.reader(StringIO(data))
         next(csv_reader)  # skip the header row
 
         # read the csv files
         for row in csv_reader:
-            question, answer, difficulty = row
-            # convert the difficulty into an int
-            difficulty = int(difficulty)
-            # store each question according to difficulty
-            self.question_difficulty[difficulty].append({
-                'question': question,
-                'answer': answer,
-                'difficulty': difficulty
-            })
+            if len(row) >= 3:  # Ensure row has enough elements
+                question, answer, difficulty = row
+                # convert the difficulty into an int
+                try:
+                    difficulty = int(difficulty)
+                    # store each question according to difficulty
+                    self.question_difficulty[difficulty].append({
+                        'question': question,
+                        'answer': answer,
+                        'difficulty': difficulty
+                    })
+                except (ValueError, KeyError):
+                    # Skip invalid rows
+                    continue
 
     # selects a new question based on difficulty
     def next_q(self):
@@ -214,7 +421,20 @@ class quiz_model:
 
 
 if __name__ == "__main__":
-    quiz = quiz_model(sample_data)
+    # Ask user if they want random questions
+    use_random = input("Would you like to use randomly generated questions? (y/n): ").lower().startswith('y')
+    
+    if use_random:
+        num_questions = input("How many questions would you like? (default: 20): ")
+        try:
+            num_questions = int(num_questions)
+        except ValueError:
+            num_questions = 20
+        
+        quiz = quiz_model(use_random=True, num_questions=num_questions)
+    else:
+        quiz = quiz_model(sample_data, use_random=False)
+    
     quiz.start_session()
 
 
